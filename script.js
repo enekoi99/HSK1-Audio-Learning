@@ -45,20 +45,40 @@ function playCurrentAudio() {
   });
 }
 
-function setMode(newMode) {
-  mode = newMode;
-  const config = modes[mode];
+// Matches the color transition in styles.css
+const TEXT_FADE_MS = 200;
+let textSwapTimer = null;
 
-  document.body.className = config.bodyClass;
+function showModeText() {
+  clearTimeout(textSwapTimer);
+  generateButton.textContent = modes[mode].generateText;
+  characterButton.textContent = modes[mode].characterText;
+  generateButton.classList.remove('text-hidden');
+  characterButton.classList.remove('text-hidden');
+}
+
+function setMode(newMode, animate) {
+  mode = newMode;
+
+  document.body.className = modes[mode].bodyClass;
   listenButton.classList.toggle('active', mode === 'listening');
   readButton.classList.toggle('active', mode === 'reading');
-  replayButton.hidden = mode === 'reading';
+  replayButton.classList.toggle('collapsed', mode === 'reading');
+  replayButton.inert = mode === 'reading';
 
   // Start fresh so a word from the other mode isn't left on screen
   currentWord = null;
   currentAudio = null;
-  generateButton.textContent = config.generateText;
-  characterButton.textContent = config.characterText;
+
+  // Fade the button text out, swap it, then fade it back in
+  if (animate) {
+    generateButton.classList.add('text-hidden');
+    characterButton.classList.add('text-hidden');
+    clearTimeout(textSwapTimer);
+    textSwapTimer = setTimeout(showModeText, TEXT_FADE_MS);
+  } else {
+    showModeText();
+  }
 
   try {
     localStorage.setItem('mode', mode);
@@ -68,11 +88,12 @@ function setMode(newMode) {
 }
 
 generateButton.addEventListener('click', () => {
+  // Also finishes any text fade still in progress from a mode switch
+  showModeText();
   currentWord = nextWord();
   currentAudio = new Audio(`audio/${currentWord}.mp3`);
 
   if (mode === 'listening') {
-    characterButton.textContent = modes.listening.characterText;
     playCurrentAudio();
   } else {
     generateButton.textContent = currentWord;
@@ -91,8 +112,8 @@ characterButton.addEventListener('click', () => {
   }
 });
 
-listenButton.addEventListener('click', () => setMode('listening'));
-readButton.addEventListener('click', () => setMode('reading'));
+listenButton.addEventListener('click', () => setMode('listening', true));
+readButton.addEventListener('click', () => setMode('reading', true));
 
 let savedMode = null;
 try {
@@ -101,3 +122,8 @@ try {
   // Fall back to listening mode
 }
 setMode(savedMode in modes ? savedMode : 'listening');
+
+// Turn on the mode-switch animations only after the first frames, so opening the page doesn't animate
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => document.documentElement.classList.add('animate'));
+});
